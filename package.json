@@ -1,0 +1,25 @@
+{
+  "name": "real-estate-whatsapp-agent",
+  "version": "0.1.0",
+  "description": "WhatsApp AI SDR agent for a real estate business: qualifies leads, logs to Google Sheets, books site visits on Google Calendar.",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js",
+    "simulate": "node test/simulate.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "openai": "^4.77.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

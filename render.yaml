@@ -1,0 +1,81 @@
+# Render Blueprint — free web service for the WhatsApp agent.
+# Deploy: push to a Git repo, then on Render → New → Blueprint, pick this repo.
+# Secrets are NOT stored here (sync: false) — Render prompts for them on first
+# deploy and stores them in the dashboard. Non-secret defaults are set inline.
+#
+# NOTE (free tier): no persistent disk, so SQLite conversation state (db/) is
+# ephemeral and resets on every spin-down/redeploy. Fine for demos. The service
+# also sleeps after ~15 min idle (≈30–50s cold start) — send a warm-up message
+# before a live demo.
+
+services:
+  - type: web
+    # Rename per client (e.g. clientname-wa-agent). Render service names are
+    # GLOBAL — if taken, Render appends a random suffix, so always copy the
+    # actual URL from the dashboard instead of assuming it matches this name.
+    name: client-wa-lead-agent
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      # Pin Node to an LTS that has prebuilt better-sqlite3 binaries. Render
+      # otherwise defaults to the newest Node, which has no prebuilt binary, so
+      # better-sqlite3 falls back to a source compile that fails (make exit 2).
+      - key: NODE_VERSION
+        value: "22"
+
+      # --- Non-secret business defaults (safe to commit) ---
+      - key: TIMEZONE
+        value: Asia/Kolkata
+      - key: BUSINESS_HOURS
+        value: 10:00-19:00
+      - key: WORKING_DAYS
+        value: Mon,Tue,Wed,Thu,Fri,Sat
+      - key: VISIT_DURATION_MIN
+        value: "45"
+      - key: GRAPH_API_VERSION
+        value: v23.0
+      - key: AICREDITS_BASE_URL
+        value: https://api.aicredits.in/v1
+      - key: MODEL
+        value: openai/gpt-4o-mini
+
+      # --- Per-client business details (set in dashboard) ---
+      - key: BUSINESS_NAME
+        sync: false
+      - key: BUSINESS_CONTEXT
+        sync: false
+      - key: HUMAN_HANDOFF_NUMBER
+        sync: false
+
+      # --- Dashboard login ---
+      - key: DASHBOARD_USER
+        sync: false
+      - key: DASHBOARD_PASS
+        sync: false
+
+      # --- WhatsApp Cloud API ---
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+
+      # --- Google (Sheet + Calendar via Apps Script) ---
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_CALENDAR_ID
+        sync: false
+      - key: APPS_SCRIPT_WEBAPP_URL
+        sync: false
+      - key: APPS_SCRIPT_SHARED_SECRET
+        sync: false
+
+      # --- AICredits key ---
+      - key: AICREDITS_API_KEY
+        sync: false

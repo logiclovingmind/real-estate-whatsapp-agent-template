@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Leads Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --line: #e8eaed;
+      --text: #1a1d24;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --good: #16a34a;
+      --warn: #d97706;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 32px; max-width: 1100px; margin: 0 auto;
+    }
+    .brand h1 { font-size: 20px; margin: 0; font-weight: 600; }
+    .brand .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    button {
+      background: var(--card); color: var(--text); border: 1px solid var(--line);
+      padding: 9px 16px; border-radius: 10px; cursor: pointer; font-size: 14px;
+    }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.on { background: var(--good); color: #fff; border-color: var(--good); }
+    button.on:hover { color: #fff; opacity: 0.92; }
+    main { padding: 0 32px 64px; max-width: 1100px; margin: 0 auto; }
+    .row { display: grid; gap: 16px; }
+    .kpis { grid-template-columns: repeat(4, 1fr); margin-bottom: 28px; }
+    @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; }
+    .kpi .label { color: var(--muted); font-size: 13px; }
+    .kpi .value { font-size: 36px; font-weight: 700; margin-top: 8px; letter-spacing: -.5px; }
+    .kpi .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .kpi.good .value { color: var(--good); }
+    .kpi.warn .value { color: var(--warn); }
+    .two { grid-template-columns: 1fr 1fr; margin-top: 16px; }
+    @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+    h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+    .cap { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+    .chart-wrap { position: relative; height: 240px; }
+    .pipeline { display: flex; flex-direction: column; gap: 12px; }
+    .stage { display: grid; grid-template-columns: 120px 1fr 40px; align-items: center; gap: 12px; }
+    .stage .name { font-size: 14px; color: var(--text); }
+    .stage .track { background: #eef1f5; border-radius: 8px; height: 26px; overflow: hidden; }
+    .stage .fill { height: 100%; border-radius: 8px; background: var(--accent); min-width: 2px; }
+    .stage .n { font-size: 14px; font-weight: 600; text-align: right; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 11px 8px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 500; font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    td a { color: var(--accent); text-decoration: none; }
+    .muted { color: var(--muted); }
+    .empty { color: var(--muted); padding: 18px 4px; }
+    #error { display: none; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 14px 18px; border-radius: 12px; margin-bottom: 18px; }
+    .avail-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 4px; }
+    .avail-form label { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+    .avail-form input[type="date"], .avail-form input[type="time"], .avail-form input[type="text"] {
+      font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text);
+    }
+    .avail-form input[type="text"] { min-width: 160px; }
+    .avail-form input:disabled { background: #f1f3f5; color: var(--muted); }
+    .avail-form button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .avail-form button.primary:hover { opacity: 0.92; color: #fff; }
+    #avail-msg { font-size: 13px; margin: 8px 0 0; min-height: 18px; }
+    #avail-msg.err { color: #b91c1c; }
+    #avail-msg.ok { color: var(--good); }
+    .block-list { list-style: none; padding: 0; margin: 14px 0 0; }
+    .block-list li { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+    .block-list li:last-child { border-bottom: none; }
+    .block-list .reason { color: var(--muted); }
+    .block-list button { padding: 5px 12px; font-size: 13px; }
+    .block-list button:hover { border-color: #b91c1c; color: #b91c1c; }
+    .chat-grid { display: grid; grid-template-columns: 280px 1fr; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; min-height: 420px; }
+    @media (max-width: 760px) { .chat-grid { grid-template-columns: 1fr; } }
+    .convo-list { border-right: 1px solid var(--line); overflow-y: auto; max-height: 520px; }
+    @media (max-width: 760px) { .convo-list { max-height: 240px; } }
+    .convo-item { padding: 12px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+    .convo-item:hover { background: #f6f7f9; }
+    .convo-item.active { background: #eef4ff; }
+    .convo-item .ci-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .convo-item .ci-name { font-weight: 600; font-size: 14px; }
+    .convo-item .ci-time { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .convo-item .ci-last { color: var(--muted); font-size: 13px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .transcript { padding: 18px; overflow-y: auto; max-height: 520px; background: #fafbfc; }
+    .transcript .ph { color: var(--muted); text-align: center; padding-top: 60px; }
+    .bubble { max-width: 76%; padding: 9px 13px; border-radius: 14px; margin-bottom: 10px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+    .bubble.user { background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 4px; margin-right: auto; }
+    .bubble.assistant { background: #d9fdd3; border-bottom-right-radius: 4px; margin-left: auto; }
+    .convo-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+    .convo-head .h-name { font-weight: 600; }
+    .convo-head .h-phone { color: var(--muted); font-size: 13px; }
+    .convo-pane { display: flex; flex-direction: column; min-width: 0; }
+    .inq-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+    .inq-head input[type="text"], .inq-head select {
+      font: inherit; padding: 8px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text);
+    }
+    .inq-head input[type="text"] { flex: 1; min-width: 180px; }
+    .inq-wrap { overflow-x: auto; }
+    .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .pill.new { background: #e8eaed; color: #3c4043; }
+    .pill.qualifying { background: #d2e3fc; color: #174ea6; }
+    .pill.qualified { background: #fef7cd; color: #7a5900; }
+    .pill.booked { background: #ceead6; color: #0d652d; }
+    .pill.lost { background: #fad2cf; color: #a50e0e; }
+    .tag-buy { color: #0d652d; font-weight: 600; }
+    .tag-rent { color: #174ea6; font-weight: 600; }
+    .tag-invest { color: #7a5900; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1 id="title">Leads Dashboard</h1>
+      <div class="sub" id="updated">Loading…</div>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button id="keepawake" title="Pings the server every 10 min so it never sleeps during a demo">Keep awake: Off</button>
+      <button id="refresh">Refresh</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="error"></div>
+
+    <section class="row kpis" id="kpis"></section>
+
+    <section class="card">
+      <h3>New leads</h3>
+      <p class="cap">How many people reached out, last 30 days</p>
+      <div class="chart-wrap"><canvas id="trend"></canvas></div>
+    </section>
+
+    <section class="row two">
+      <div class="card">
+        <h3>Pipeline</h3>
+        <p class="cap">Where your leads stand right now</p>
+        <div class="pipeline" id="pipeline"></div>
+      </div>
+      <div class="card">
+        <h3>Top areas</h3>
+        <p class="cap">Most requested localities</p>
+        <div class="chart-wrap"><canvas id="areas"></canvas></div>
+      </div>
+    </section>
+
+    <section class="row two">
+      <div class="card">
+        <h3>Upcoming visits</h3>
+        <p class="cap">Site visits booked and coming up</p>
+        <div id="upcoming"></div>
+      </div>
+      <div class="card">
+        <h3>Leads to call</h3>
+        <p class="cap">Qualified, but no visit booked yet</p>
+        <div id="hot"></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3>All inquiries</h3>
+      <p class="cap">Every customer and what they're looking for</p>
+      <div class="inq-head">
+        <input type="text" id="inq-search" placeholder="Search name, area, phone…" />
+        <select id="inq-intent">
+          <option value="">All — buy & rent</option>
+          <option value="buy">Buy</option>
+          <option value="rent">Rent</option>
+          <option value="invest">Invest</option>
+        </select>
+        <select id="inq-stage">
+          <option value="">All stages</option>
+          <option value="new">New</option>
+          <option value="qualifying">In conversation</option>
+          <option value="qualified">Qualified</option>
+          <option value="booked">Visit booked</option>
+          <option value="lost">Lost</option>
+        </select>
+      </div>
+      <div class="inq-wrap" id="inq-wrap"></div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3>Availability</h3>
+      <p class="cap">Block out times you're not available — the agent won't offer those slots</p>
+      <div class="avail-form">
+        <label>Date <input type="date" id="b-date" /></label>
+        <label><input type="checkbox" id="b-allday" /> All day</label>
+        <label>From <input type="time" id="b-start" value="10:00" /></label>
+        <label>To <input type="time" id="b-end" value="13:00" /></label>
+        <input type="text" id="b-reason" placeholder="Reason (optional)" />
+        <button class="primary" id="b-add">Block time</button>
+      </div>
+      <p id="avail-msg"></p>
+      <ul class="block-list" id="blocks"></ul>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3>Conversations</h3>
+      <p class="cap">WhatsApp chats with your leads</p>
+      <div class="chat-grid">
+        <div class="convo-list" id="convo-list"></div>
+        <div class="convo-pane">
+          <div class="convo-head" id="convo-head" style="display:none">
+            <div><span class="h-name" id="h-name"></span> <span class="h-phone" id="h-phone"></span></div>
+          </div>
+          <div class="transcript" id="transcript"><div class="ph">Select a lead to see the chat.</div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let charts = {};
+    Chart.defaults.color = "#6b7280";
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+
+    const STAGE_LABELS = {
+      new: "New",
+      qualifying: "In conversation",
+      qualified: "Qualified",
+      booked: "Visit booked",
+      lost: "Lost",
+    };
+
+    function kpi(label, value, hint, cls) {
+      return `<div class="card kpi ${cls || ""}"><div class="label">${label}</div>
+        <div class="value">${value}</div>${hint ? `<div class="hint">${hint}</div>` : ""}</div>`;
+    }
+
+    function destroy(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+    function line(id, data) {
+      destroy(id);
+      charts[id] = new Chart(document.getElementById(id), {
+        type: "line",
+        data: {
+          labels: data.map((d) => d.label.slice(5)),
+          datasets: [{ data: data.map((d) => d.value), borderColor: "#2563eb", backgroundColor: "#2563eb14", fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2 }],
+        },
+        options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { beginAtZero: true, border: { display: false }, ticks: { precision: 0, maxTicksLimit: 4 }, grid: { color: "#eef1f5" } } }, maintainAspectRatio: false },
+      });
+    }
+
+    function hbar(id, data) {
+      destroy(id);
+      charts[id] = new Chart(document.getElementById(id), {
+        type: "bar",
+        data: { labels: data.map((d) => d.label), datasets: [{ data: data.map((d) => d.value), backgroundColor: "#2563eb", borderRadius: 6, maxBarThickness: 22 }] },
+        options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, border: { display: false }, ticks: { precision: 0, maxTicksLimit: 5 }, grid: { color: "#eef1f5" } }, y: { grid: { display: false }, border: { display: false } } }, maintainAspectRatio: false },
+      });
+    }
+
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+    let allInquiries = [];
+
+    function intentTag(intent) {
+      const i = String(intent || "").toLowerCase();
+      if (!i) return '<span class="muted">—</span>';
+      const cls = i === "buy" ? "tag-buy" : i === "rent" ? "tag-rent" : i === "invest" ? "tag-invest" : "";
+      return `<span class="${cls}">${esc(i.charAt(0).toUpperCase() + i.slice(1))}</span>`;
+    }
+
+    function renderInquiries() {
+      const q = document.getElementById("inq-search").value.trim().toLowerCase();
+      const fi = document.getElementById("inq-intent").value;
+      const fs = document.getElementById("inq-stage").value;
+      const rows = allInquiries.filter((r) => {
+        if (fi && String(r.intent).toLowerCase() !== fi) return false;
+        if (fs && r.stage !== fs) return false;
+        if (q) {
+          const hay = (r.name + " " + r.area + " " + r.phone + " " + r.configuration).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+      const wrap = document.getElementById("inq-wrap");
+      if (!rows.length) {
+        wrap.innerHTML = '<div class="empty">No inquiries match.</div>';
+        return;
+      }
+      wrap.innerHTML = `<table><thead><tr>
+        <th>Customer</th><th>Looking to</th><th>Area</th><th>Config</th><th>Budget</th><th>Status</th>
+        </tr></thead><tbody>${rows.map((r) => `
+        <tr>
+          <td>${esc(r.name || "—")}<div class="muted">${esc(r.phone)}</div></td>
+          <td>${intentTag(r.intent)}</td>
+          <td>${esc(r.area || "—")}</td>
+          <td>${esc(r.configuration || "—")}</td>
+          <td>${esc(r.budget || "—")}</td>
+          <td><span class="pill ${esc(r.stage)}">${esc(STAGE_LABELS[r.stage] || r.stage)}</span></td>
+        </tr>`).join("")}</tbody></table>`;
+    }
+
+    function pipeline(funnel) {
+      const max = Math.max(1, ...funnel.map((f) => f.value));
+      return funnel.map((f) => `
+        <div class="stage">
+          <div class="name">${STAGE_LABELS[f.label] || f.label}</div>
+          <div class="track"><div class="fill" style="width:${(f.value / max) * 100}%"></div></div>
+          <div class="n">${f.value}</div>
+        </div>`).join("");
+    }
+
+    function visitsTable(rows) {
+      if (!rows.length) return '<div class="empty">No upcoming visits yet.</div>';
+      return `<table><thead><tr><th>When</th><th>Name</th><th>Phone</th></tr></thead><tbody>${rows.map((r) => `
+        <tr><td>${esc(r.datetime)}</td><td>${esc(r.name)}</td><td class="muted">${esc(r.phone)}</td></tr>`).join("")}</tbody></table>`;
+    }
+
+    function hotTable(rows) {
+      if (!rows.length) return '<div class="empty">No one waiting — all caught up.</div>';
+      return `<table><thead><tr><th>Name</th><th>Looking for</th><th>Area</th></tr></thead><tbody>${rows.map((r) => `
+        <tr><td>${esc(r.name)}<div class="muted">${esc(r.phone)}</div></td><td>${esc(r.configuration)}</td><td>${esc(r.area)}</td></tr>`).join("")}</tbody></table>`;
+    }
+
+    async function load() {
+      const err = document.getElementById("error");
+      err.style.display = "none";
+      try {
+        const res = await fetch("/api/dashboard", { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const body = await res.json();
+        if (!body.ok) throw new Error(body.reason || "failed");
+        render(body);
+      } catch (e) {
+        err.textContent = "Could not load dashboard data: " + e.message;
+        err.style.display = "block";
+      }
+    }
+
+    function render(body) {
+      const m = body.metrics, k = m.kpis;
+      document.title = body.businessName + " — Leads";
+      document.getElementById("title").textContent = body.businessName;
+      document.getElementById("updated").textContent = "Updated " + new Date(body.generatedAt).toLocaleString();
+
+      document.getElementById("kpis").innerHTML = [
+        kpi("Total leads", k.totalLeads, "all time"),
+        kpi("New this week", k.newThisWeek, k.newToday + " today"),
+        kpi("Leads to call", k.hotLeads, "qualified, not booked", "warn"),
+        kpi("Visits booked", k.booked, k.upcoming + " upcoming", "good"),
+      ].join("");
+
+      line("trend", m.trend);
+      document.getElementById("pipeline").innerHTML = pipeline(m.funnel);
+      hbar("areas", m.localities.slice(0, 5));
+      document.getElementById("upcoming").innerHTML = visitsTable(m.upcomingVisits.slice(0, 8));
+      document.getElementById("hot").innerHTML = hotTable(m.hotLeads.slice(0, 8));
+
+      allInquiries = m.inquiries || [];
+      renderInquiries();
+    }
+
+    // --- Availability blocks ---
+    function availMsg(text, cls) {
+      const el = document.getElementById("avail-msg");
+      el.textContent = text || "";
+      el.className = cls || "";
+    }
+
+    function syncAllDay() {
+      const off = document.getElementById("b-allday").checked;
+      document.getElementById("b-start").disabled = off;
+      document.getElementById("b-end").disabled = off;
+    }
+
+    function renderBlocks(blocks) {
+      const el = document.getElementById("blocks");
+      if (!blocks.length) {
+        el.innerHTML = '<li class="empty" style="border:none">No time blocked — all slots open.</li>';
+        return;
+      }
+      el.innerHTML = blocks.map((b) => `
+        <li>
+          <span>${esc(b.label)}${b.reason ? ` <span class="reason">· ${esc(b.reason)}</span>` : ""}</span>
+          <button data-id="${esc(b.id)}">Remove</button>
+        </li>`).join("");
+      el.querySelectorAll("button[data-id]").forEach((btn) => {
+        btn.addEventListener("click", () => removeBlock(btn.getAttribute("data-id")));
+      });
+    }
+
+    async function loadBlocks() {
+      try {
+        const res = await fetch("/api/availability", { headers: { Accept: "application/json" } });
+        const body = await res.json();
+        if (!body.ok) throw new Error(body.reason || "failed");
+        renderBlocks(body.blocks || []);
+      } catch (e) {
+        availMsg("Could not load blocks: " + e.message, "err");
+      }
+    }
+
+    async function addBlock() {
+      const date = document.getElementById("b-date").value;
+      const allDay = document.getElementById("b-allday").checked;
+      const start = document.getElementById("b-start").value;
+      const end = document.getElementById("b-end").value;
+      const reason = document.getElementById("b-reason").value.trim();
+      if (!date) { availMsg("Pick a date first.", "err"); return; }
+      if (!allDay && (!start || !end)) { availMsg("Set a start and end time.", "err"); return; }
+      availMsg("Saving…", "");
+      try {
+        const res = await fetch("/api/availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date, allDay, start, end, reason }),
+        });
+        const body = await res.json();
+        if (!body.ok) throw new Error(body.reason || "failed");
+        availMsg("Blocked " + (body.label || ""), "ok");
+        document.getElementById("b-reason").value = "";
+        loadBlocks();
+      } catch (e) {
+        availMsg("Could not block time: " + e.message, "err");
+      }
+    }
+
+    async function removeBlock(id) {
+      availMsg("Removing…", "");
+      try {
+        const res = await fetch("/api/availability?id=" + encodeURIComponent(id), { method: "DELETE" });
+        const body = await res.json();
+        if (!body.ok) throw new Error(body.reason || "failed");
+        availMsg("Block removed.", "ok");
+        loadBlocks();
+      } catch (e) {
+        availMsg("Could not remove block: " + e.message, "err");
+      }
+    }
+
+    document.getElementById("inq-search").addEventListener("input", renderInquiries);
+    document.getElementById("inq-intent").addEventListener("change", renderInquiries);
+    document.getElementById("inq-stage").addEventListener("change", renderInquiries);
+
+    document.getElementById("b-allday").addEventListener("change", syncAllDay);
+    document.getElementById("b-add").addEventListener("click", addBlock);
+
+    // --- Conversations ---
+    let activePhone = null;
+
+    function relTime(s) {
+      if (!s) return "";
+      const d = new Date(s.replace(" ", "T"));
+      if (isNaN(d)) return "";
+      const mins = Math.round((Date.now() - d.getTime()) / 60000);
+      if (mins < 1) return "now";
+      if (mins < 60) return mins + "m";
+      if (mins < 1440) return Math.round(mins / 60) + "h";
+      return Math.round(mins / 1440) + "d";
+    }
+
+    function renderConvoList(list) {
+      const el = document.getElementById("convo-list");
+      if (!list.length) {
+        el.innerHTML = '<div class="empty" style="padding:18px 14px">No conversations yet.</div>';
+        return;
+      }
+      el.innerHTML = list.map((c) => {
+        const who = c.name || c.phone;
+        const prefix = c.lastRole === "assistant" ? "You: " : "";
+        return `<div class="convo-item${c.phone === activePhone ? " active" : ""}" data-phone="${esc(c.phone)}">
+          <div class="ci-top"><span class="ci-name">${esc(who)}</span><span class="ci-time">${esc(relTime(c.updatedAt))}</span></div>
+          <div class="ci-last">${esc(prefix + (c.lastMessage || "—"))}</div>
+        </div>`;
+      }).join("");
+      el.querySelectorAll(".convo-item").forEach((item) => {
+        item.addEventListener("click", () => openConvo(item.getAttribute("data-phone")));
+      });
+    }
+
+    async function loadConvos() {
+      try {
+        const res = await fetch("/api/conversations", { headers: { Accept: "application/json" } });
+        const body = await res.json();
+        if (!body.ok) throw new Error(body.reason || "failed");
+        renderConvoList(body.conversations || []);
+      } catch (e) {
+        document.getElementById("convo-list").innerHTML =
+          '<div class="empty" style="padding:18px 14px">Could not load: ' + esc(e.message) + "</div>";
+      }
+    }
+
+    async function openConvo(phone) {
+      activePhone = phone;
+      document.querySelectorAll(".convo-item").forEach((i) =>
+        i.classList.toggle("active", i.getAttribute("data-phone") === phone));
+      const t = document.getElementById("transcript");
+      t.innerHTML = '<div class="ph">Loading…</div>';
+      try {
+        const res = await fetch("/api/conversations/" + encodeURIComponent(phone), { headers: { Accept: "application/json" } });
+        const body = await res.json();
+        if (!body.ok) throw new Error(body.reason || "failed");
+        const c = body.conversation;
+        document.getElementById("convo-head").style.display = "flex";
+        document.getElementById("h-name").textContent = c.name || "Lead";
+        document.getElementById("h-phone").textContent = c.phone;
+        if (!c.messages.length) {
+          t.innerHTML = '<div class="ph">No messages yet.</div>';
+          return;
+        }
+        t.innerHTML = c.messages.map((m) =>
+          `<div class="bubble ${m.role === "user" ? "user" : "assistant"}">${esc(m.content)}</div>`).join("");
+        t.scrollTop = t.scrollHeight;
+      } catch (e) {
+        t.innerHTML = '<div class="ph">Could not load chat: ' + esc(e.message) + "</div>";
+      }
+    }
+
+    document.getElementById("refresh").addEventListener("click", () => {
+      load(); loadBlocks(); loadConvos(); if (activePhone) openConvo(activePhone);
+    });
+
+    // --- Keep awake: ping the server every 10 min so Render's free tier
+    // doesn't spin down (it sleeps after ~15 min idle). On by default. ---
+    let awakeTimer = null;
+    const KEEP_AWAKE_MS = 10 * 60 * 1000;
+    function ping() { fetch("/", { cache: "no-store" }).catch(() => {}); }
+    function setKeepAwake(on) {
+      const btn = document.getElementById("keepawake");
+      if (on) {
+        if (!awakeTimer) awakeTimer = setInterval(ping, KEEP_AWAKE_MS);
+        ping();
+        btn.textContent = "Keep awake: On";
+        btn.classList.add("on");
+      } else {
+        clearInterval(awakeTimer); awakeTimer = null;
+        btn.textContent = "Keep awake: Off";
+        btn.classList.remove("on");
+      }
+    }
+    document.getElementById("keepawake").addEventListener("click", () => setKeepAwake(!awakeTimer));
+    setKeepAwake(false);
+    load();
+    loadBlocks();
+    loadConvos();
+  </script>
+</body>
+</html>
